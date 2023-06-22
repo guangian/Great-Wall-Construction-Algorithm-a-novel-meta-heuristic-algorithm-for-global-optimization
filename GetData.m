@@ -1,0 +1,348 @@
+%% 获取数据
+function [data,option]=GetData(FuncName)
+switch FuncName
+    case 'F1'
+        %% Raster maps - robot pathfinding
+        figure
+        %         t = tiledlayout(1,3);
+        %         t.TileSpacing = 'tight';
+        %         t.Padding = 'tight';
+        % 载入数据
+        MAP=[0 0 0 0 0 0 0 0 0 1 1 0 0 1 0 0 1 1 0 0
+            0 0 0 0 0 1 0 0 0 1 0 0 0 1 0 1 1 0 0 0
+            0 1 1 0 0 1 0 0 0 0 0 1 1 1 1 0 0 0 0 0
+            0 1 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 1 1
+            0 1 1 0 0 1 1 1 1 0 0 0 0 1 1 0 0 0 0 0
+            0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 1 1 1 1
+            0 1 1 1 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0
+            0 0 1 0 0 0 0 0 0 0 0 0 1 1 1 1 1 0 0 0
+            1 1 1 0 0 0 1 0 0 0 1 0 0 0 0 0 0 1 1 1
+            0 1 1 1 0 0 1 0 0 0 1 0 0 1 1 0 0 1 0 0
+            0 1 1 0 0 0 0 0 1 0 1 0 0 1 0 0 0 1 1 1
+            0 0 1 0 1 0 0 0 1 0 1 0 1 1 0 0 0 0 0 1
+            0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+            1 1 1 0 1 1 0 0 1 0 0 0 1 1 0 0 0 0 1 0
+            1 1 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 1 1 0
+            0 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 0
+            1 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 1
+            1 1 0 0 1 0 0 1 1 0 0 1 1 0 1 0 0 0 1 0
+            0 0 0 0 1 1 0 1 1 1 0 1 1 1 1 0 0 0 0 0
+            0 0 0 1 0 0 1 1 1 1 0 0 0 0 0 0 0 0 0 0];
+        L = bwlabel(MAP);   % 对连通区域进行标记
+        landmark=[];
+        for i=1:max(max(L))
+            [p1,p2]=find(L==i);
+            temp=MAP*0;
+            for j=1:length(p1)
+                temp(p1(j),p2(j))=1;
+            end
+            D=bwdist(temp');
+            [n,m]=find((1<D)&(D<2));
+            landmark=[landmark;n,m];
+        end
+        nexttile
+        %         figure
+        %%给值是1的坐标赋值黑色，给值是0的坐标赋值白色
+        b =MAP; %把MAP赋值给b
+        b(end+1,end+1) = 0;
+        colormap([1 1 1;0 0 0]);  % 创建颜色:其中1是白色，0是黑色
+        pcolor(0.5:size(MAP,2)+0.5,0.5:size(MAP,1)+0.5,b); % 赋予栅格颜色
+        set(gca,'XTick',1:size(MAP,1),'YTick',1:size(MAP,2));  % 设置坐标
+        axis image xy;
+        hold on
+        plot(landmark(:,1),landmark(:,2),'b+');
+        %
+        data.landmark=landmark;
+        data.map=MAP;
+        sizeMap=size(MAP);
+        node=[];
+        for i=1:sizeMap(1)
+            for j=1:sizeMap(2)
+                x=i;
+                y=j;
+                if MAP(i,j)==0
+                    node=[node;y,x];
+                end
+            end
+        end
+        data.node=node;
+        data.D=pdist2(node,node);
+        %data.R=1;%只允许上下行走
+        data.R=sqrt(2); %可以斜着走
+        %
+        [p1,p2]=find(data.D<=data.R);
+        clear D
+        for i=1:length(p1)
+            D(i,1)=data.D(p1(i),p2(i));
+        end
+        data.net=sparse(p1,p2,D);
+        % 查找每个特殊点的编号
+        for i=1:length(data.landmark(:,1))
+            data.noLM(i)=find(node(:,1)==data.landmark(i,1) & node(:,2)==data.landmark(i,2));
+        end
+        % 起点和终点
+        data.S=[1,1];
+        data.E=[20,20];
+        data.noS=find(node(:,1)==data.S(1,1) & node(:,2)==data.S(1,2));
+        data.noE=find(node(:,1)==data.E(1,1) & node(:,2)==data.E(1,2));
+        %
+        data.numLM0=10;
+        dim=length(data.noLM);
+        option.dim=dim;
+        lb=0;
+        ub=1;
+        option.lb=lb;
+        option.ub=ub;
+        if length(option.lb)==1
+            option.lb=ones(1,option.dim)*option.lb;
+            option.ub=ones(1,option.dim)*option.ub;
+        end
+        option.fobj=@F3;
+        %         option.showIter=0;
+        option.numAgent=50;        %种群个体数 size of population
+        option.maxIteration=100;    %最大迭代次数 maximum number of interation
+    case 'F5'
+        %% Optimization study of cold chain distribution logistics vehicle scheduling for a dairy company 
+        % 载入数据
+        data.node=xlsread('数据.xlsx',1);
+        data.numNode=length(data.node(:,1));
+        data.maxT=3*60; %最大工作时间 180min
+        data.v=40; %车速40km/h
+        data.maxV=6; %最大车辆
+
+        data.maxCustom=10; %最大服务客服数量
+        data.sigma=0.72; %制冷剂的单位价格
+        data.Cz=100; %车辆单位里程折旧费
+        data.Cw=100; %车辆单位里程维护费
+        data.Cr=100; %每辆车单位时间内的人工成本
+        data.Cy=100; %车辆单位里程燃油的价格
+        data.P=20;      %产品单价（元/千克）
+        data.Q1=1500;   %冷藏车的核载量（千克）
+        data.Q2=528;    %牛奶框的最大装载量（千克）
+        data.T=3;       %车辆一次配送最大行驶时间（小时）
+        data.mu=0.08;   %车辆的折旧程度
+        data.phi=0.2;   %车厢材料的导热系数（w/（m．k））
+        data.Sw=40.54;  %车厢的外表面积（m2）
+        data.Sn=34.58;  %车厢的内表面积（m2）
+        data.N=12.43;   %车厢体积（m3）
+        data.gapT=20;   %车厢内外温差
+        data.beta=0.5;  %开门频度系数
+        data.Qy=(1+data.mu)*data.phi*sqrt(data.Sw*data.Sn)*data.gapT;
+        data.Qz=(0.54*data.N+3.22)*data.beta*data.gapT;
+        data.Qk1=8.18;  %空载时单位距离油耗量k1Q (L/100km)
+        data.Qb1=2.08;  %增加单位质量货物单位距离油耗量b1Q (L/100km?t)
+        data.Qk2=7.29;  %空载时单位距离油耗量
+        data.Qb2=1.98;  %增加单位质量货物单位距离油耗量
+        data.b=1;
+        data.Kr=1;
+        data.Kt=1;
+        data.noCenter=1;
+        data.noNode=2:data.numNode;
+        data.W_milk=0.2; %0.2奶制品
+        data.W_milk_B=1.6; %牛奶框重量
+        data.T1=[1,200,1;
+            201,600,3;
+            601,1000,5;
+            1001,2000,10];
+        data.T2=[1,20,1;
+            21,30,3;
+            31,60,5];
+        % 绘制地图
+        figure
+        hold on
+        plot(data.node(data.noCenter,2),data.node(data.noCenter,3),'h','LineWidth',2,...
+            'MarkerEdgeColor','k',...
+            'MarkerFaceColor','r',...
+            'MarkerSize',10);
+        plot(data.node(data.noNode,2),data.node(data.noNode,3),'o','LineWidth',2,...
+            'MarkerEdgeColor','k',...
+            'MarkerFaceColor','g',...
+            'MarkerSize',10);
+        % 计算节点间的距离
+        for i=1:data.numNode
+            for j=1:data.numNode
+                data.D(i,j)=norm(data.node(i,2:3)-data.node(j,2:3),2);
+            end
+        end
+        %
+        option.dim=data.numNode+data.maxV-2; %八个决策变量
+        lb=0;
+        ub=1;
+        option.lb=lb;
+        option.ub=ub;
+        if length(option.lb)==1
+            option.lb=ones(1,option.dim)*option.lb;
+            option.ub=ones(1,option.dim)*option.ub;
+        end
+        option.fobj=@F4;
+        %option.fobj0=option.fobj;
+        option.showIter=0;
+        % 算法参数设置 Parameters
+        % 基本参数
+        option.numAgent=50;        %种群个体数 size of population
+        option.maxIteration=100;    %最大迭代次数 maximum number of interation
+    case 'F3'
+        %% Optimization study of cold chain distribution logistics vehicle scheduling for a dairy company 
+        figure
+        % 载入数据
+        data.Unit=xlsread('data.xlsx',1);
+        data.Distance=xlsread('data.xlsx',2);
+        data.x0=xlsread('data.xlsx',3);
+        data.numUnit=length(data.Unit(:,1));
+        data.mapSize=[55,50]; %车间大小
+        data.d=[2,5,2.5];
+        data.r=1.5;
+        data.accuracy=0.1; %布局精度
+        data.v=4000/3600;
+        data.maxT=432*3600;
+        data.upLoadT=322;
+        data.downLoadT=282;
+        data.minUnit=2; %区段设备数量
+        data.maxS=ceil(data.numUnit/2); %缓冲区最大数量
+        data.maxDQ=1710000;
+        data.C_AGV=100;
+        data.C_QD=0.083;
+        data.w=[0.5,0.2,0.3]; %AGV子系统的两个权值
+        data.maxAGV=4;
+        data.Dmax=95;
+        data.LWmax=55*50;
+        % 算法参数设置
+        dim=data.numUnit+data.maxS-1;
+        %
+        option.dim=dim; %八个决策变量
+        lb=0;
+        ub=1;
+        option.lb=lb;
+        option.ub=ub;
+        if length(option.lb)==1
+            option.lb=ones(1,option.dim)*option.lb;
+            option.ub=ones(1,option.dim)*option.ub;
+        end
+        option.fobj=@F5;
+        %option.fobj0=option.fobj;
+        option.showIter=0;
+        % 算法参数设置 Parameters
+        % 基本参数
+        option.numAgent=100;        %种群个体数 size of population
+        option.maxIteration=200;    %最大迭代次数 maximum number of interation
+    case 'F2'
+        %% Logistics centre location problem: factory-centre-demand point
+        %载入数据
+        [data.node,data.node0,data.node1]=xlsread('节点经纬度.xlsx',1);
+        data.D1=xlsread('物流节点到需求点距离.xlsx',1);
+        data.D2=xlsread('物流节点到产地距离.xlsx',1);
+        data.demand=xlsread('需求.xlsx',1);
+        data.noC=find(data.node(:,3)==1);
+        data.noD=find(data.node(:,3)<3);
+        data.noP=find(data.node(:,3)==3);
+        data.numC=length(data.noC);
+        data.numD=length(data.noD);
+        data.numP=length(data.noP);
+        data.numSelected=6;
+        for i=1:data.numD
+            for j=1:data.numC
+                D=distance(data.node(data.noD(i),2),data.node(data.noD(i),1),data.node(data.noC(j),2),data.node(data.noC(j),1));  % distance看matlab help
+                pi=3.1415926;
+                dx=D*6371*2*pi/360;
+                data.D1(i,j)=dx;
+                %data.D1(i,j)=norm(data.node(data.noD(i),1:2)-data.node(data.noC(j),1:2));
+            end
+        end
+        for i=1:data.numC
+            for j=1:data.numP
+                D=distance(data.node(data.noC(i),2),data.node(data.noC(i),1),data.node(data.noP(j),2),data.node(data.noP(j),1));  % distance看matlab help
+                pi=3.1415926;
+                dx=D*6371*1000*2*pi/360;
+                data.D2(i,j)=dx;
+                %data.D2(i,j)=norm(data.node(data.noC(i),1:2)-data.node(data.noP(j),1:2))*1000;
+            end
+        end
+        data.maxLoad=760; %最大能力
+        data.alpha=0.5;
+        data.ck=245; %库存成本
+        data.ct1=0.19; %运输成本1
+        data.ct2=0.26; %运输成本2
+        data.cb=2.45; %可变成本
+        figure
+        hold on
+        plot(data.node(data.noC,1),data.node(data.noC,2),'rs','LineWidth',2,...
+            'MarkerEdgeColor','k',...
+            'MarkerFaceColor','g',...
+            'MarkerSize',10)
+        plot(data.node(data.noD,1),data.node(data.noD,2),'ro','LineWidth',2,...
+            'MarkerEdgeColor','k',...
+            'MarkerFaceColor','r',...
+            'MarkerSize',10)
+        plot(data.node(data.noP,1),data.node(data.noP,2),'rh','LineWidth',2,...
+            'MarkerEdgeColor','k',...
+            'MarkerFaceColor','b',...
+            'MarkerSize',10)
+        %算法参数设置
+        dim=data.numC+data.numD;
+        %
+        option.dim=dim; %八个决策变量
+        lb=0;
+        ub=1;
+        option.lb=lb;
+        option.ub=ub;
+        if length(option.lb)==1
+            option.lb=ones(1,option.dim)*option.lb;
+            option.ub=ones(1,option.dim)*option.ub;
+        end
+        option.fobj=@F6;
+        %option.fobj0=option.fobj;
+        option.showIter=0;
+        % 算法参数设置 Parameters
+        % 基本参数
+        option.numAgent=20;        %种群个体数 size of population
+        option.maxIteration=20;    %最大迭代次数 maximum number of interation
+    case 'F4'
+        %% Power system bus optimization based on tide calculation
+        % 载入数据
+        addpath(genpath('matpower7.0'))
+        %
+        data.mpc=case9;
+        data.numBranch=length(data.mpc.branch(:,1));
+        data.distance=xlsread('线型.xlsx',2);
+        data.Line=xlsread('线型.xlsx',1);
+        data.numLine=length(data.Line(:,1));
+        data.base=100;
+        data.lamdaLoss=25; %损耗成本系数
+        % 算法参数设置
+        dim=data.numBranch;
+        %
+        option.dim=dim; %八个决策变量
+        lb=0;
+        ub=1;
+        option.lb=lb;
+        option.ub=ub;
+        if length(option.lb)==1
+            option.lb=ones(1,option.dim)*option.lb;
+            option.ub=ones(1,option.dim)*option.ub;
+        end
+        option.fobj=@F8;
+    otherwise
+        global Prob K
+        index=find(FuncName=='-');
+        Name=FuncName(1:index-1);
+        switch Name
+            case 'EngneerProblem'
+                Prob=FuncName(index+1:end);
+                [ub,lb,dim,fobj] =EngineerProblem(Prob);
+                option.lb=lb;
+                option.ub=ub;
+                option.dim=dim; %决策变量
+                option.GloMin=inf;
+                option.fobj=fobj;
+                data=[];
+            case 'CEC2017'
+                F=FuncName(index+1:end);
+                [ub,lb,dim,fobj] = CEC2017(F);
+                option.lb=lb;
+                option.ub=ub;
+                option.dim=dim; %决策变量
+                option.GloMin=str2double(FuncName(index+2:end))*100;
+                option.fobj=fobj;
+                data=[];
+        end
+end
